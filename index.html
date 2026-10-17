@@ -61,6 +61,12 @@ h2{margin:0 0 4px;font-size:17px;font-weight:700}.sub{color:var(--mut);font-size
 @media(max-width:640px){#wsvg text{font-size:21px}#wsvg text[font-weight]{font-size:22px}}
 .dv{align-self:start}
 .masc{display:block;border-radius:50%;object-fit:cover;background:#162032;border:3px solid #1f2a3d;box-shadow:0 0 0 4px #10b98122,0 14px 34px -10px #000c}.masc-l{width:144px;height:144px;margin:0 auto 14px}.hrow{display:flex;align-items:center;gap:16px}.masc-h{width:120px;height:120px;flex:none}@media(max-width:640px){.masc-l{width:124px;height:124px}.masc-h{width:84px;height:84px}}@media(prefers-reduced-motion:reduce){.masc{animation:none}}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:40;background:linear-gradient(90deg,#10b981,#34d399);color:#022c22;border:0;border-radius:999px;padding:14px 20px;font:800 15px Inter,system-ui;box-shadow:0 12px 30px -8px #10b98188;cursor:pointer}
+#lan{position:fixed;inset:0;background:#000b;display:none;align-items:flex-end;justify-content:center;z-index:55;backdrop-filter:blur(4px)}#lan.on{display:flex;animation:fi .2s}@media(min-width:641px){#lan{align-items:center}}
+#lan .mbox{border-radius:18px 18px 0 0;max-height:92vh}@media(min-width:641px){#lan .mbox{border-radius:18px;max-width:480px}}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fg .w{grid-column:1/-1}.fg label{font-size:12.5px;color:var(--mut);display:block}.fg input{width:100%;margin-top:5px;background:#0b1120;border:1px solid #2b3a52;color:var(--txt);border-radius:12px;padding:11px;font:16px Inter,system-ui}.fg input:focus{outline:2px solid #60a5fa66;border-color:var(--b)}
+#lmsg{min-height:18px;font-size:13px;text-align:center;margin-top:8px}.dl{background:none;border:0;color:#f87171;font-size:16px;cursor:pointer;padding:2px 6px;margin-left:6px}
+.hx{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;background:#ffffff06;margin-bottom:6px;font-size:14px}.hx.out{background:#f59e0b14;border:1px solid #f59e0b40}.hx .tr{font-size:12.5px;color:var(--mut)}.row .nm b{cursor:pointer}
 </style></head><body><div id="ptr">⟳</div><div id="login" style="display:none"><form class="lcard" id="lgf" onsubmit="doLogin(event)"><video class="masc masc-l" autoplay muted loop playsinline preload="metadata" poster="media/mascote.jpg" aria-hidden="true"><source src="media/mascote.webm" type="video/webm"><source src="media/mascote.mp4" type="video/mp4"></video><h1>Painel Saúde</h1><p class="sub">Entre para ver seus dados.</p>
 <label>E-mail<input id="lem" type="email" autocomplete="username" required></label><label>Senha<input id="lpw" type="password" autocomplete="current-password" required></label>
 <button class="lbtn" type="submit">Entrar</button><button type="button" class="lnk" onclick="forgot()">Esqueci minha senha</button></form>
@@ -96,6 +102,12 @@ h2{margin:0 0 4px;font-size:17px;font-weight:700}.sub{color:var(--mut);font-size
  <p class="note">Valores transcritos dos laudos. <b style="color:#34d399">Verde</b> = dentro da referência/melhorou · <b style="color:#fbbf24">Amarelo</b> = atenção. Não substitui avaliação médica.</p>
 </section>
 </div></div>
+<button class="fab" onclick="openLan()">+ Lançar</button>
+<div id="lan" onclick="if(event.target==this)closeLan()"><div class="mbox"><button class="mx" onclick="closeLan()">✕</button><h3>Lançar dados</h3>
+<div class="tabs" id="ltabs"><button class="tab on" data-t="meal" onclick="ltab('meal')">Refeição</button><button class="tab" data-t="weight" onclick="ltab('weight')">Peso/Balança</button><button class="tab" data-t="exam" onclick="ltab('exam')">Exame</button></div>
+<form id="lf" onsubmit="saveLan(event)"><div class="fg" id="lfields"></div>
+<div class="fg" id="lpinw" style="margin-top:10px"><label class="w">PIN<input id="lpin" type="password" inputmode="numeric" autocomplete="off" required></label></div>
+<button class="lbtn" type="submit" id="lsave">Salvar</button><p id="lmsg"></p></form></div></div>
 <div id="exm" onclick="this.classList.remove('on')"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -151,7 +163,7 @@ function kpis(){const[k,p]=tot();const K=[["Peso atual",br(WN),"kg","Última pes
  document.getElementById('kpis').innerHTML=K.map((c,i)=>`<div class="card kpi" style="animation-delay:${i*.06}s"><div class="l">${c[0]}</div><div class="v">${c[1]}<small>${c[2]}</small></div><div class="s">${c[3]}</div>${c[4]?`<div class="bar"><i ${c[5]?`id="${c[5]}"`:''} data-w="${Math.min(c[4][0],100)}" style="background:${c[4][1]}"></i></div>`:''}</div>`).join('')}
 function draw(){const[k,p]=tot();ck.style.strokeDashoffset=C*(1-Math.min(k/GK,1));cp.style.strokeDashoffset=C*(1-Math.min(p/GP,1));count(kv,k);count(pv,p);
  free.textContent=(k<=GK?`Livre: ${(GK-k).toLocaleString('pt-BR')} kcal`:`+${(k-GK).toLocaleString('pt-BR')} kcal acima da meta`)+' · '+(p<=GP?`faltam ${GP-p} g de proteína`:`proteína batida (+${p-GP} g)`);free.classList.toggle('over',k>GK);
- meals.innerHTML=M.map((m,i)=>`<div class="meal ${on[i]?'':'off'}" onclick="on[${i}]^=1;draw()"><span class="n"><span class="ck">✓</span><span>${m[0]}</span></span><span class="m"><b>${m[1]}</b> kcal · <b>${m[2]}</b> g</span></div>`).join('');
+ meals.innerHTML=M.map((m,i)=>`<div class="meal ${on[i]?'':'off'}" onclick="on[${i}]^=1;draw()"><span class="n"><span class="ck">✓</span><span>${esc(m[0])}</span></span><span class="m"><b>${m[1]}</b> kcal · <b>${m[2]}</b> g<button class="dl" title="Apagar" onclick="event.stopPropagation();delMeal(${i})">🗑</button></span></div>`).join('');
  const s=id=>document.getElementById(id);if(s('kk')){s('kk').textContent=k.toLocaleString('pt-BR');s('kks').textContent=kTxt(k);s('kp').textContent=p;s('kps').textContent=pTxt(p);s('kb').style.width=Math.min(k/GK*100,100)+'%';s('pb').style.width=Math.min(p/GP*100,100)+'%'}}
 function chart(){const s=wsvg,x0=48,x1=620,yT=20,yB=280,lo=Math.floor((Math.min(GOAL,...W.map(w=>w[1]))-5)/10)*10,hi=Math.ceil((Math.max(...W.map(w=>w[1]))+5)/10)*10,SP=Math.max(W.at(-1)[2],1),X=d=>x0+d/SP*(x1-x0),Y=v=>yB-(v-lo)/(hi-lo)*(yB-yT);let h=`<defs><linearGradient id="wa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#60a5fa" stop-opacity=".35"/><stop offset="1" stop-color="#60a5fa" stop-opacity="0"/></linearGradient></defs>`;
  for(let v=lo+10;v<=hi;v+=10)h+=`<line x1="${x0}" x2="${x1}" y1="${Y(v)}" y2="${Y(v)}" stroke="#ffffff0d"/><text x="${x0-10}" y="${Y(v)+4}" fill="#8b97ab" font-size="12" text-anchor="end">${v}</text>`;
@@ -172,7 +184,7 @@ function exams(){const f=v=>v==null?'—':typeof v=='string'?v:v.toLocaleString(
  const rows=E.rows.filter(r=>cur=='Todos'||r.g==cur);let h=`<div class="row h"><div>Exame</div>${D.map(d=>`<div>${d}</div>`).join('')}<div>Referência</div><div>Variação</div><div>Status</div></div>`,lastG='';
  rows.forEach(r=>{if(cur=='Todos'&&r.g!=lastG){lastG=r.g;h+=`<div style="padding:16px 6px 4px;color:#93c5fd;font-weight:700;font-size:13px">${r.g}</div>`}
   const n=r.v.filter(x=>typeof x=='number'),mx=Math.max(...n,1e-9),chip=`<span class="chip c${r.s}">${r.s=='g'?'ok':'atenção'}</span>`;
-  h+=`<div class="row"><div class="nm"><div><b>${r.n}</b><small>${r.u}${r.o?' · '+r.o:''}</small></div><span class="chipm">${chip}</span></div>${r.v.map((x,i)=>`<div class="dv${x==null?' nil':''}"><span class="lbl">${D[i]}</span>${f(x)}${typeof x=='number'?`<div class="mini"><i data-h="${x/mx*100}" style="background:${cols[i]}"></i></div>`:''}</div>`).join('')}<div class="ref">${r.r}</div><div class="d ${r.s}">${r.d||'—'}</div><div class="st">${chip}</div></div>`});
+  h+=`<div class="row"><div class="nm"><div><b onclick="exHist(${E.rows.indexOf(r)})">${r.n}</b><small>${r.u}${r.o?' · '+r.o:''}</small></div><span class="chipm">${chip}</span></div>${r.v.map((x,i)=>`<div class="dv${x==null?' nil':''}"><span class="lbl">${D[i]}</span>${f(x)}${typeof x=='number'?`<div class="mini"><i data-h="${x/mx*100}" style="background:${cols[i]}"></i></div>`:''}</div>`).join('')}<div class="ref">${r.r}</div><div class="d ${r.s}">${r.d||'—'}</div><div class="st">${chip}</div></div>`});
  ex.style.setProperty('--n',D.length);ex.innerHTML=h;requestAnimationFrame(()=>setTimeout(()=>ex.querySelectorAll('.mini i').forEach(b=>b.style.height=Math.max(b.dataset.h*.28,2)+'px'),50))}
 [ck,cp].forEach(e=>{e.style.strokeDasharray=C;e.style.strokeDashoffset=C});
 
@@ -184,5 +196,31 @@ function thumb(id){return HASIMG(id)?`<button class="thb" onclick="event.prevent
 function showEx(id){const d=id[0],i=+id.slice(1)-1,e=T[d][1][i];exm.innerHTML=`<div class="mbox" onclick="event.stopPropagation()"><button class="mx" onclick="exm.classList.remove('on')">✕</button><h3>${e[0]}</h3>${HASIMG(id)?`<img src="img/${id}.webp" alt="${e[0]}"><p class="cap">Início → fim do movimento</p>`:''}<ol>${CUE[id].map(c=>`<li>${c}</li>`).join('')}</ol><p class="cap">${e[1]} · descanso ${e[2]}</p></div>`;exm.classList.add('on')}
 function tset(i,v){const st=tget(tday);st[i]=v;localStorage.setItem(tk(tday),JSON.stringify(st));treinos()}
 function resetT(){localStorage.removeItem(tk(tday));treinos()}
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let lt='meal';const LF={meal:[['name','Nome','text','w',1],['kcal','Kcal','number','',1],['protein_g','Proteína (g)','number','',0],['date','Data','date','w',1]],
+ weight:[['kg','Peso (kg)','number','',0],['fat_pct','Gordura (%)','number','',0],['muscle_kg','Músculo (kg)','number','',0],['visceral','Gordura visceral','number','',0],['water_pct','Água (%)','number','',0],['date','Data','date','',1]],
+ exam:[['name','Exame (ex.: Glicose)','text','w',1],['value','Valor','number','',1],['unit','Unidade','text','',0],['ref_min','Ref. mínima','number','',0],['ref_max','Ref. máxima','number','',0],['date','Data da coleta','date','w',1]]};
+function ltab(t){lt=t;ltabs.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t==t));
+ lfields.innerHTML=LF[t].map(([k,l,ty,c,req])=>`<label class="${c}">${l}<input name="${k}" type="${ty}" ${ty=='number'?'step="any" inputmode="decimal"':''} ${req?'required':''} ${k=='name'&&t=='exam'?'list="exl"':''} value="${k=='date'?(t=='meal'?mday||todayISO():todayISO()):''}"></label>`).join('')+(t=='exam'&&E?`<datalist id="exl">${E.rows.map(r=>`<option value="${esc(r.n)}">`).join('')}</datalist>`:'');lmsg.textContent=''}
+function openLan(){lpin.value=localStorage.getItem('lpin')||'';lpinw.style.display=lpin.value?'none':'';ltab(lt);lan.classList.add('on')}
+function closeLan(){lan.classList.remove('on')}
+async function rpc(kind,payload){const pin=lpin.value||localStorage.getItem('lpin')||prompt('PIN');if(!pin)throw new Error('PIN obrigatório');
+ const{data,error}=await sb.rpc('add_entry',{pin,kind,payload});
+ if(error){if(/PIN/.test(error.message))localStorage.removeItem('lpin');if(/add_entry|schema cache|Could not find/.test(error.message))throw new Error('Função de lançamento ainda não instalada no Supabase.');throw new Error(error.message)}
+ localStorage.setItem('lpin',pin);lastUpd=null;await load();return data}
+async function saveLan(e){e.preventDefault();const p={};new FormData(lf).forEach((v,k)=>{if(k!='pin'&&v!=='')p[k]=v});
+ for(const k of Object.keys(p))if(LF[lt].find(f=>f[0]==k)[2]=='number')p[k]=+String(p[k]).replace(',','.');
+ if(lt=='weight'&&Object.keys(p).length<2){lmsg.style.color='#fbbf24';lmsg.textContent='Preencha pelo menos um valor.';return}
+ lsave.disabled=true;lmsg.style.color='#93c5fd';lmsg.textContent='Salvando…';
+ try{await rpc(lt,p);if(lt=='meal'&&p.date)setDay(p.date);lmsg.style.color='#34d399';lmsg.textContent='Salvo!';setTimeout(closeLan,700)}
+ catch(err){lmsg.style.color='#fbbf24';lmsg.textContent=err.message;lpinw.style.display=''}finally{lsave.disabled=false}}
+async function delMeal(i){const m=DB.meals[mday][i];if(!confirm(`Apagar "${m.name}" de ${iso2br(mday)}?`))return;
+ try{await rpc('delete_meal',{date:mday,index:i,name:m.name})}catch(err){alert(err.message)}}
+function refRange(r){if(r.min!=null||r.max!=null)return[r.min,r.max];const n=(r.r||'').replace(/\./g,'').replace(/,/g,'.').match(/-?\d+(\.\d+)?/g);if(!n)return[null,null];
+ if(/[<≤]|até/i.test(r.r))return[null,+n[0]];if(/[>≥]/.test(r.r))return[+n[0],null];return n.length>1?[+n[0],+n[1]]:[null,null]}
+function exHist(ix){const r=E.rows[ix],[mn,mx]=refRange(r),pts=r.v.map((v,i)=>[E.dates[i],v]).filter(x=>typeof x[1]=='number');let prev=null;
+ const rows=pts.map(([d,v])=>{const out=(mn!=null&&v<mn)||(mx!=null&&v>mx),dv=prev==null?'':`${v>prev?'▲':v<prev?'▼':'='} ${v>prev?'+':''}${br(v-prev,2).replace(/,00$/,'')} vs anterior`;prev=v;
+  return`<div class="hx ${out?'out':''}"><span><b>${d}</b></span><span>${v.toLocaleString('pt-BR')} ${esc(r.u)} ${out?'<span class="chip cy">fora da ref.</span>':''}<div class="tr">${dv}</div></span></div>`}).reverse().join('');
+ exm.innerHTML=`<div class="mbox" onclick="event.stopPropagation()"><button class="mx" onclick="exm.classList.remove('on')">✕</button><h3>${esc(r.n)}</h3><p class="cap">Referência do laudo: ${esc(r.r||'—')} ${esc(r.u)} · variação total: ${esc(r.d||'—')}</p>${rows||'<p class="cap">Sem valores.</p>'}</div>`;exm.classList.add('on')}
 load();
 </script><script>if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update())</script></body></html>
