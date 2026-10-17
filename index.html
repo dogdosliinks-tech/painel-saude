@@ -199,20 +199,21 @@ function resetT(){localStorage.removeItem(tk(tday));treinos()}
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let lt='meal';const LF={meal:[['name','Nome','text','w',1],['kcal','Kcal','number','',1],['protein_g','Proteína (g)','number','',0],['date','Data','date','w',1]],
  weight:[['kg','Peso (kg)','number','',0],['fat_pct','Gordura (%)','number','',0],['muscle_kg','Músculo (kg)','number','',0],['visceral','Gordura visceral','number','',0],['water_pct','Água (%)','number','',0],['date','Data','date','',1]],
- exam:[['name','Exame (ex.: Glicose)','text','w',1],['value','Valor','number','',1],['unit','Unidade','text','',0],['ref_min','Ref. mínima','number','',0],['ref_max','Ref. máxima','number','',0],['date','Data da coleta','date','w',1]]};
-function ltab(t){lt=t;ltabs.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t==t));
- lfields.innerHTML=LF[t].map(([k,l,ty,c,req])=>`<label class="${c}">${l}<input name="${k}" type="${ty}" ${ty=='number'?'step="any" inputmode="decimal"':''} ${req?'required':''} ${k=='name'&&t=='exam'?'list="exl"':''} value="${k=='date'?(t=='meal'?mday||todayISO():todayISO()):''}"></label>`).join('')+(t=='exam'&&E?`<datalist id="exl">${E.rows.map(r=>`<option value="${esc(r.n)}">`).join('')}</datalist>`:'');lmsg.textContent=''}
+ examm:[['name','Exame (ex.: Glicose)','text','w',1],['value','Valor','number','',1],['unit','Unidade','text','',0],['ref_min','Ref. mínima','number','',0],['ref_max','Ref. máxima','number','',0],['date','Data da coleta','date','w',1]],
+ exam:[['file','Arquivo do exame (PDF ou foto)','file','w',1],['date','Data da coleta','date','',1],['note','Observação (opcional)','text','',0]]};
+function ltab(t){lt=t;ltabs.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t==t.replace('examm','exam')));CAND=[];
+ lfields.innerHTML=LF[t].map(([k,l,ty,c,req])=>`<label class="${c}">${l}<input name="${k}" type="${ty}" ${ty=='number'?'step="any" inputmode="decimal"':''} ${req?'required':''} ${k=='name'&&t=='examm'?'list="exl"':''} ${ty=='file'?'accept="application/pdf,image/jpeg,image/png" onchange="readFile(this)"':''} value="${k=='date'?(t=='meal'?mday||todayISO():todayISO()):''}"></label>`).join('')+(t=='exam'?`<div class="w" id="ocr"></div><div class="w"><button type="button" class="rst" onclick="ltab('examm')">ou digitar um valor manualmente</button></div><div class="w" id="upl">${uplList()}</div>`:'')+(t=='examm'&&E?`<datalist id="exl">${E.rows.map(r=>`<option value="${esc(r.n)}">`).join('')}</datalist>`:'');lmsg.textContent=''}
 function openLan(){lpin.value=localStorage.getItem('lpin')||'';lpinw.style.display=lpin.value?'none':'';ltab(lt);lan.classList.add('on')}
 function closeLan(){lan.classList.remove('on')}
 async function rpc(kind,payload){const pin=lpin.value||localStorage.getItem('lpin')||prompt('PIN');if(!pin)throw new Error('PIN obrigatório');
  const{data,error}=await sb.rpc('add_entry',{pin,kind,payload});
  if(error){if(/PIN/.test(error.message))localStorage.removeItem('lpin');if(/add_entry|schema cache|Could not find/.test(error.message))throw new Error('Função de lançamento ainda não instalada no Supabase.');throw new Error(error.message)}
  localStorage.setItem('lpin',pin);lastUpd=null;await load();return data}
-async function saveLan(e){e.preventDefault();const p={};new FormData(lf).forEach((v,k)=>{if(k!='pin'&&v!=='')p[k]=v});
+async function saveLan(e){e.preventDefault();if(lt=='exam')return saveUpload();const p={};new FormData(lf).forEach((v,k)=>{if(k!='pin'&&v!=='')p[k]=v});
  for(const k of Object.keys(p))if(LF[lt].find(f=>f[0]==k)[2]=='number')p[k]=+String(p[k]).replace(',','.');
  if(lt=='weight'&&Object.keys(p).length<2){lmsg.style.color='#fbbf24';lmsg.textContent='Preencha pelo menos um valor.';return}
  lsave.disabled=true;lmsg.style.color='#93c5fd';lmsg.textContent='Salvando…';
- try{await rpc(lt,p);if(lt=='meal'&&p.date)setDay(p.date);lmsg.style.color='#34d399';lmsg.textContent='Salvo!';setTimeout(closeLan,700)}
+ try{await rpc(lt=='examm'?'exam':lt,p);if(lt=='meal'&&p.date)setDay(p.date);lmsg.style.color='#34d399';lmsg.textContent='Salvo!';setTimeout(closeLan,700)}
  catch(err){lmsg.style.color='#fbbf24';lmsg.textContent=err.message;lpinw.style.display=''}finally{lsave.disabled=false}}
 async function delMeal(i){const m=DB.meals[mday][i];if(!confirm(`Apagar "${m.name}" de ${iso2br(mday)}?`))return;
  try{await rpc('delete_meal',{date:mday,index:i,name:m.name})}catch(err){alert(err.message)}}
@@ -222,5 +223,36 @@ function exHist(ix){const r=E.rows[ix],[mn,mx]=refRange(r),pts=r.v.map((v,i)=>[E
  const rows=pts.map(([d,v])=>{const out=(mn!=null&&v<mn)||(mx!=null&&v>mx),dv=prev==null?'':`${v>prev?'▲':v<prev?'▼':'='} ${v>prev?'+':''}${br(v-prev,2).replace(/,00$/,'')} vs anterior`;prev=v;
   return`<div class="hx ${out?'out':''}"><span><b>${d}</b></span><span>${v.toLocaleString('pt-BR')} ${esc(r.u)} ${out?'<span class="chip cy">fora da ref.</span>':''}<div class="tr">${dv}</div></span></div>`}).reverse().join('');
  exm.innerHTML=`<div class="mbox" onclick="event.stopPropagation()"><button class="mx" onclick="exm.classList.remove('on')">✕</button><h3>${esc(r.n)}</h3><p class="cap">Referência do laudo: ${esc(r.r||'—')} ${esc(r.u)} · variação total: ${esc(r.d||'—')}</p>${rows||'<p class="cap">Sem valores.</p>'}</div>`;exm.classList.add('on')}
+let CAND=[];const loadJS=u=>new Promise((ok,no)=>{if(document.querySelector(`script[src="${u}"]`))return ok();const s=document.createElement('script');s.src=u;s.onload=ok;s.onerror=()=>no(new Error('Falha ao carregar leitor'));document.head.appendChild(s)});
+const PDFJS='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',TESS='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+async function fileText(f,st){if(f.type=='application/pdf'){await loadJS(PDFJS);pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS.replace('pdf.min.js','pdf.worker.min.js');
+  const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;let out=[];for(let i=1;i<=doc.numPages;i++){st(`Lendo página ${i}/${doc.numPages}…`);const c=await (await doc.getPage(i)).getTextContent(),L={};
+  c.items.forEach(it=>{const y=Math.round(it.transform[5]/3);(L[y]=L[y]||[]).push([it.transform[4],it.str])});Object.keys(L).sort((a,b)=>b-a).forEach(y=>out.push(L[y].sort((a,b)=>a[0]-b[0]).map(x=>x[1]).join(' ')))}return out.join('\n')}
+ await loadJS(TESS);const r=await Tesseract.recognize(f,'por',{logger:m=>m.status=='recognizing text'&&st(`Lendo imagem… ${Math.round(m.progress*100)}%`)});return r.data.text}
+const num=s=>s==null?null:+s.replace(/\.(?=\d{3}\b)/g,'').replace(',','.');
+function parseLab(t){const U='(mg\\/dL|g\\/dL|mmol\\/L|mEq\\/L|ng\\/mL|pg\\/mL|µUI\\/mL|uUI\\/mL|µU\\/mL|mUI\\/mL|UI\\/L|U\\/L|ng\\/dL|µg\\/dL|ug\\/dL|nmol\\/L|%|fL|pg|mm3|\\/mm³|\\/mm3|mil\\/mm³|milhões\\/mm³|x10\\^?\\d\\/[µu]L)',N='(\\d{1,3}(?:\\.\\d{3})*(?:,\\d+)?|\\d+(?:[.,]\\d+)?)',rows=[],seen=new Set();
+ const re=new RegExp(`^\\s*([A-Za-zÀ-ú][A-Za-zÀ-ú0-9 ()\\-\\/.]{1,48}?)\\s*[:.\\s]\\s*${N}\\s*${U}?(?:.*?${N}\\s*(?:a|-|–|até)\\s*${N})?`,'i');
+ t.split(/\n/).forEach(l=>{l=l.replace(/\s+/g,' ').trim();const m=l.match(re);if(!m)return;const n=m[1].replace(/[\s.:]+$/,'').trim();if(n.length<3||/^(data|página|pag|cpf|rg|idade|sexo|crm|tel|fone|pedido|protocolo)/i.test(n))return;
+  let mn=num(m[4]),mx=num(m[5]);const lt=l.match(new RegExp(`(?:inferior|menor|<|até)\\s*(?:a\\s*)?${N}`,'i')),gt=l.match(new RegExp(`(?:superior|maior|>)\\s*(?:a\\s*)?${N}`,'i'));
+  if(mn==null&&lt)mx=num(lt[1]);if(mn==null&&gt)mn=num(gt[1]);const k=n.toLowerCase();if(seen.has(k))return;seen.add(k);
+  const known=E&&E.rows.find(r=>r.n.toLowerCase()==k);rows.push({name:known?known.n:n,value:num(m[2]),unit:m[3]||(known?known.u:''),ref_min:mn,ref_max:mx})});return rows}
+async function readFile(inp){const f=inp.files[0];if(!f)return;CAND=[];const st=t=>ocr.innerHTML=`<p class="cap">${t}</p>`;
+ if(f.size>15*1048576){st('Arquivo maior que 15 MB.');inp.value='';return}
+ try{st('Carregando leitor…');const t=await fileText(f,st);CAND=parseLab(t);candTable(t.trim().length<20)}catch(e){st('Não consegui ler automaticamente ('+esc(e.message)+'). O arquivo ainda pode ser enviado para conferência.')}}
+function candTable(empty){const iv=(i,k,ty)=>`<input data-i="${i}" data-k="${k}" ${ty?'type="number" step="any" inputmode="decimal"':''} value="${CAND[i][k]??''}" oninput="CAND[${i}].${k}=this.value" style="padding:7px;font-size:14px">`;
+ ocr.innerHTML=`<p class="cap">${CAND.length?`Encontrei ${CAND.length} possíveis resultados. Confira, corrija ou remova antes de salvar:`:empty?'Não achei texto legível. O arquivo será enviado para conferência.':'Não reconheci resultados. O arquivo será enviado para conferência.'}</p>`+
+ CAND.map((c,i)=>c?`<div class="fg" style="grid-template-columns:2fr 1fr 1fr;padding:8px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px"><label class="w" style="display:flex;gap:6px;align-items:center">${iv(i,'name')}<button type="button" class="dl" onclick="CAND[${i}]=null;candTable()">✕</button></label><label>Valor${iv(i,'value',1)}</label><label>Unid.${iv(i,'unit')}</label><label>Mín/Máx<span style="display:flex;gap:4px">${iv(i,'ref_min',1)}${iv(i,'ref_max',1)}</span></label></div>`:'').join('')}
+function uplList(){const u=(DB&&DB.exam_uploads)||[];if(!u.length)return'';return`<p class="cap" style="margin-top:12px">Arquivos enviados</p>`+u.slice().reverse().map(x=>`<div class="hx"><span><b>${iso2br(x.date)}</b> · ${esc(x.file_name||'arquivo')}${x.note?`<div class="tr">${esc(x.note)}</div>`:''}</span><span class="chip ${x.status=='conferido'?'cg':'cy'}">${esc(x.status)}</span></div>`).join('')}
+async function saveUpload(){const f=lf.querySelector('input[name=file]').files[0],date=lf.querySelector('input[name=date]').value,note=lf.querySelector('input[name=note]').value.trim();if(!f)return;
+ const say=(t,c)=>{lmsg.style.color=c||'#93c5fd';lmsg.textContent=t};lsave.disabled=true;
+ try{const rows=CAND.filter(c=>c&&String(c.name).trim()&&c.value!==''&&c.value!=null&&!isNaN(num(String(c.value))));
+  for(const r of rows)if(!(await sb.auth.getSession()).data.session)throw new Error('Sessão expirada');
+  say('Enviando arquivo…');const ext=(f.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,''),path=`${date}/${Date.now()}.${ext}`;
+  const{error}=await sb.storage.from('exames').upload(path,f,{contentType:f.type,upsert:false});if(error)throw new Error('Upload: '+error.message);
+  await rpc('exam_upload',{date,path,file_name:f.name.slice(0,160),note,rows_typed:rows.length});
+  let i=0;for(const r of rows){say(`Salvando resultados ${++i}/${rows.length}…`);const p={date,name:String(r.name).trim(),value:num(String(r.value)),unit:r.unit||''};
+   if(r.ref_min!==''&&r.ref_min!=null)p.ref_min=num(String(r.ref_min));if(r.ref_max!==''&&r.ref_max!=null)p.ref_max=num(String(r.ref_max));await rpc('exam',p)}
+  say(rows.length?`Salvo! ${rows.length} resultado(s) + arquivo para conferência.`:'Arquivo enviado para conferência.','#34d399');CAND=[];setTimeout(closeLan,1200)}
+ catch(err){say(err.message,'#fbbf24');lpinw.style.display=''}finally{lsave.disabled=false}}
 load();
 </script><script>if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update())</script></body></html>

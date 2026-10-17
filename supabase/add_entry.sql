@@ -92,6 +92,13 @@ begin
     ex := jsonb_set(ex, array['rows',idx::text], rec);
     d := jsonb_set(d,'{exams}', ex, true);
 
+  elsif kind = 'exam_upload' then
+    if coalesce(payload->>'path','') !~ '^[A-Za-z0-9._/-]+$' then raise exception 'arquivo inválido'; end if;
+    rec := jsonb_build_object('date',dt,'path',payload->>'path','file_name',left(coalesce(payload->>'file_name',''),160),
+      'note',left(coalesce(payload->>'note',''),500),'status','pendente','rows_typed',coalesce((payload->>'rows_typed')::int,0),
+      'uploaded_at',now());
+    d := jsonb_set(d,'{exam_uploads}', coalesce(d->'exam_uploads','[]'::jsonb) || jsonb_build_array(rec), true);
+
   else
     raise exception 'tipo inválido: %', kind;
   end if;
@@ -102,3 +109,9 @@ end $$;
 revoke all on function public.add_entry(text,text,jsonb) from public, anon;
 grant execute on function public.add_entry(text,text,jsonb) to authenticated;
 notify pgrst, 'reload schema';
+
+-- Storage: bucket privado 'exames' (já criado). Políticas para usuário logado enviar/ler:
+drop policy if exists "exames_insert_auth" on storage.objects;
+create policy "exames_insert_auth" on storage.objects for insert to authenticated with check (bucket_id = 'exames');
+drop policy if exists "exames_select_auth" on storage.objects;
+create policy "exames_select_auth" on storage.objects for select to authenticated using (bucket_id = 'exames');
